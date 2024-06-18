@@ -20,9 +20,23 @@ jobs:
         name: id_rsa
         known_hosts: ${{ secrets.KNOWN_HOSTS }}
 
-    - name: Sync files to EC2
+    - name: Generate .env file
+      run: |
+        echo "HOST=0.0.0.0" > .env
+        echo "PORT=1337" >> .env
+        echo "APP_KEYS=${{ secrets.APP_KEYS }}" >> .env
+        echo "API_TOKEN_SALT=${{ secrets.API_TOKEN_SALT }}" >> .env
+        echo "ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}" >> .env
+        echo "TRANSFER_TOKEN_SALT=${{ secrets.TRANSFER_TOKEN_SALT }}" >> .env
+        echo "# Database" >> .env
+        echo "DATABASE_CLIENT=sqlite" >> .env
+        echo "DATABASE_FILENAME=.tmp/data.db" >> .env
+        echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+
+    - name: Sync files to EC2 including .env
       run: |
         rsync -avz -e "ssh -o StrictHostKeyChecking=no" --exclude="node_modules" ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/my-project
+        scp -o StrictHostKeyChecking=no .env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/my-project/.env
 
     - name: Install dependencies and restart PM2
       run: |
