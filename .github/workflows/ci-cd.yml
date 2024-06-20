@@ -33,15 +33,22 @@ jobs:
         echo "DATABASE_FILENAME=.tmp/data.db" >> .env
         echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
 
-    - name: Sync files to EC2 including .env
+    - name: Archive files
       run: |
-        rsync -avz -e "ssh -o StrictHostKeyChecking=no" --exclude="node_modules" ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/my-project
-        scp -o StrictHostKeyChecking=no .env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/my-project/.env
+        tar -czf strapi-project.tar.gz *
+
+    - name: Sync files to EC2
+      run: |
+        scp -o StrictHostKeyChecking=no strapi-project.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/srv/strapi-deploy
+        scp -o StrictHostKeyChecking=no .env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/srv/strapi-deploy/.env
 
     - name: Install dependencies and restart PM2
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd /home/${{ secrets.EC2_USER }}/my-project
+          cd /srv/strapi-deploy
+          tar -xzf strapi-project.tar.gz
+          rm strapi-project.tar.gz
           npm install
-          pm2 restart ecosystem.config.js --env production
+          pm2 restart strapi-app || pm2 start npm --name "strapi-app" -- run start
+          pm2 save
         EOF
